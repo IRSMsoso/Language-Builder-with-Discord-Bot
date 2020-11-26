@@ -29,6 +29,6 @@ class LanguageManager:
             asyncio.get_event_loop().run_until_complete(self.bot.close())
 
 
-lm = LanguageManager("NzgxNDA2MDkwNTYyMjQwNTQy.X79LIQ.bOjGf9z0fDuWiSGf3Qw-wi5uLHs")
+lm = LanguageManager("token")
 asyncio.get_event_loop().run_until_complete(lm.start_bot())
 print("Returned.")
