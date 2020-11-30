@@ -1,0 +1,38 @@
+First, we have to start with assumptions we make about the languages that can be created. Since we don't want it to be too difficult to program, we'll assume:
+
+1. The language is comprised of words.
+2. Sentences get meaning across, and are comprised of the words of the language separated by a space.
+3. Sentences and words are separated by punctuation, and that changes their meaning.
+4. All words use the standard english alphabet and punctuation.
+5. Different versions of the same word are counted as different words that are "related" to each other. (see word structure)
+
+
+Ideas:
+A voting system for new words, examples, and language rules.
+Easy ways to search for the above.
+Words/Examples of the day.
+Uploading of audio clips as pronunciation examples.
+Saving to a file to keep progress.
+
+
+
+Bot Commands:
+addword
+removeword
+editword
+addexample
+removeexample
+editexample
+
+
+
+
+
+Outlining object structures:
+
+Word:
+Written representation - string. (Actual text of the word)
+Written pronunciation - string. (The word sounded out, such as in english or using the International Phonetic Alphabet)
+Other related words. - list. (This is a bit subjective per language, so what gos in each word's related list would likely be outlined in the language's rules)
+Definition - string. (What it means)
+Audio pronunciation? - ?. (Audio of the word)
