@@ -5,6 +5,7 @@ First, we have to start with assumptions we make about the languages that can be
 3. Sentences and words are separated by punctuation, and that changes their meaning.
 4. All words use the standard english alphabet and punctuation.
 5. Different versions of the same word are counted as different words that are "related" to each other. (see word structure)
+6. All different words have different texts.
 
 
 Ideas:
@@ -17,9 +18,14 @@ Saving to a file to keep progress.
 
 
 Bot Commands:
-addword
-removeword
-editword
+After initial keyword like createlanguage, parameters will need to be indicated by putting parenthesis around them to simplify parsing the string.
+
+createlanguage "Language Name"  - Creates a new language bound to the channel that this command is run in.
+addword "Text" "Pronunciation" "Definition" "Related word 1" "Related word 2" ... "Related word n"
+removeword "Text"
+editword "Text of word to edit" "Parameter (Text, Pronunciation, Definition)" "Change"
+addrelatedword "Text of word to edit" "Text of related word"
+removerelatedword "Text of word to edit" "Text of related word"
 addexample
 removeexample
 editexample
