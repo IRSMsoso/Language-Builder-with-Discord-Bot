@@ -21,6 +21,10 @@ Bot Commands:
 After initial keyword like createlanguage, parameters will need to be indicated by putting parenthesis around them to simplify parsing the string.
 
 createlanguage "Language Name"  - Creates a new language bound to the channel that this command is run in.
+addrule
+editrule
+removerule
+changename
 addword "Text" "Pronunciation" "Definition" "Related word 1" "Related word 2" ... "Related word n"
 removeword "Text"
 editword "Text of word to edit" "Parameter (Text, Pronunciation, Definition)" "Change"
@@ -42,3 +46,11 @@ Written pronunciation - string. (The word sounded out, such as in english or usi
 Other related words. - list. (This is a bit subjective per language, so what gos in each word's related list would likely be outlined in the language's rules)
 Definition - string. (What it means)
 Audio pronunciation? - ?. (Audio of the word)
+
+
+Language:
+Name - string
+words - list of words
+channel - int
+rules - list of strings
+intro_message - discord.Message (First message that includes an updated list of rules.)
