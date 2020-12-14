@@ -1,5 +1,6 @@
 # I'm going to use the discord.py module for creating a discord bot. https://github.com/Rapptz/discord.py
-# Asyncio is required to interact with the discord bot. asyncio.sleep() is useful as well. After these are included, it's easier to write the entire program asynchronously.
+# Asyncio is required to interact with the discord bot. asyncio.sleep() is useful as well.
+# After these are included, it's easier to just write the entire program asynchronously.
 # Pickle is used for saving languages to binary file.
 import discord
 import asyncio
@@ -10,6 +11,7 @@ from enum import auto
 import os.path
 
 
+# Enum to classify all the different types of amendments that can occur.
 class ChangeType(Enum):
     ADDRULE = auto()
     EDITRULE = auto()
@@ -26,7 +28,7 @@ class Change:
 
     def __init__(self, change_type=None):
         self.change_type = change_type
-        self.time_remaining = 10.0  # 172,800.0
+        self.time_remaining = 60.0  # 172,800.0 normally. Lower for testing.
         self.voting_message_id = None
 
     def __str__(self):
@@ -34,6 +36,12 @@ class Change:
 
 
 class Word:
+    """
+    Word
+
+    Really just a storage class for all the information
+    that makes up a word.
+    """
 
     def __init__(self, text, pronunciation, definition, related_words=None):
         self.text = text
@@ -46,6 +54,12 @@ class Word:
 
 
 class Language:
+    """
+    Language
+
+    Handles the data that makes up each language
+    as well as some searching and serialization helper methods.
+    """
 
     def __init__(self, name="New Language"):
         self.words = []
@@ -57,6 +71,12 @@ class Language:
         self.should_update_rules = False
 
     async def get_word(self, text):
+        """
+
+        :param text: The text of the word to get from this language.
+        :return: The gotten word, or None if it wasn't found.
+        """
+
         for word in self.words:
             if word.text == text:
                 return word
@@ -64,9 +84,20 @@ class Language:
         return None
 
     async def get_pickle_data(self):
+        """
+        Gets data from the language for pickling.
+        :return: The data.
+        """
+
         return [self.name, self.words, self.channel_id, self.rules, self.intro_message_id, self.amendments]
 
     async def build_from_pickle_data(self, data):
+        """
+        Rebuilds the data from pickled data when loading.
+        :param data: The data to unpack.
+        :return: Nothing.
+        """
+
         self.name = data[0]
         self.words = data[1]
         self.channel_id = data[2]
@@ -76,6 +107,12 @@ class Language:
 
 
 def get_command_list(full_command):
+    """
+    Helper function that *painfully* parses the string given to a usable format.
+    :param full_command: The raw command minus the prefix.
+    :return: Ideally a list of commands and parameters. None if there was an error.
+    """
+
     original_command = full_command
     first_command_index = original_command.find('\"')
     if first_command_index == -1:
@@ -84,10 +121,6 @@ def get_command_list(full_command):
     command_list[0] = command_list[0].replace(' ',
                                               '')  # Replace any spaces since the first command can never have them.
     original_command = original_command[first_command_index:]  # Remove that first command from the rest of the string.
-    # print("Command List:")
-    # print(command_list)
-    # print("Original Command")
-    # print(original_command)
     while len(original_command) > 0:  # Until everything is drained form the string of commands.
         check_same = original_command
         command_list.append(original_command[1:original_command.find('\"', 1)])
@@ -95,108 +128,124 @@ def get_command_list(full_command):
         original_command = original_command[
                            original_command.find('\"'):]  # Get rid of spaces left over between parameters.
         if check_same == original_command:  # Check if we are stuck in a loop due to formatting errors.
-            # print("Error, Something went wrong. Likely formatted incorrectly.")
             return None
-        # print(command_list)
-        # print(original_command)
         # sleep(1)
     return command_list
 
 
+async def make_change(change, language):
+    """
+    Modifies the language in accordance to the change presented.
+    This is what is called when the changes are ready to be put into place from voting.
+    :param change: The change that is about to happen, including all the data needed to know what to do.
+    :param language: The language to modify.
+    :return: Nothing
+    """
+
+    change_type = change.change_type
+
+    if change_type == ChangeType.ADDWORD:
+        new_word = Word(change.text, change.pronunciation, change.definition, related_words=change.related_words)
+        language.words.append(new_word)
+
+    elif change_type == ChangeType.EDITWORD:
+        word = await language.get_word(change.text)
+        if word is not None:
+            if change.parameter == "text":
+                word.text = change.modification
+            elif change.parameter == "pronunciation":
+                word.pronunciation = change.modification
+            elif change.parameter == "definition":
+                word.definition = change.modification
+
+    elif change_type == ChangeType.REMOVEWORD:
+        word = await language.get_word(change.text)
+        if word is not None:
+            language.words.remove(word)
+
+    elif change_type == ChangeType.ADDRULE:
+        language.rules.append(change.rule_desc)
+        language.should_update_rules = True
+
+    elif change_type == ChangeType.EDITRULE:
+        if 1 <= change.rule_number <= len(language.rules):
+            language.rules[change.rule_number - 1] = change.rule_desc
+            language.should_update_rules = True
+
+    elif change_type == ChangeType.REMOVERULE:
+        if 1 <= change.rule_number <= len(language.rules):
+            del language.rules[change.rule_number - 1]
+            language.should_update_rules = True
+
+    elif change_type == ChangeType.CHANGENAME:
+        language.name = change.new_name
+        language.should_update_rules = True
+
+    elif change_type == ChangeType.ADDRELATEDWORD:
+        word = await language.get_word(change.text)
+        related_word = await language.get_word(change.related_word_text)
+        if (word is not None) and (related_word is not None):
+            word.related_words.append(related_word)
+
+    elif change_type == ChangeType.REMOVERELATEDWORD:
+        word = await language.get_word(change.text)
+        related_word = await language.get_word(change.related_word_text)
+        if (word is not None) and (related_word is not None):
+            word.related_words.remove(related_word)
+
+
 class LanguageBot(discord.Client):
+    """
+    The meat of the program. Handles the discord bot, as well as
+    the background processes for handling the voting system.
+    Also has all of the languages instanced inside it.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.languages = []
         self.prefix = '\\'  # What should be in front of commands. This also allows the users to *eventually* change it to prevent conflict with other bots.
         self.run_task = self.loop.create_task(self.background_tasks())
-        # if os.path.isfile("languages.cam"):
-            # asyncio.get_event_loop().run_until_complete(self.load_languages())
-        print("Done init")
+        if os.path.isfile("languages.cam"):
+            asyncio.get_event_loop().run_until_complete(self.load_languages())
 
     async def save_languages(self):
+        """
+        Save all the languages to file so they are not lost.
+        :return: nothing.
+        """
+
         file = open("languages.cam", 'wb')
         data = []
         for language in self.languages:
             data.append(await language.get_pickle_data())
-        print(data)
         pickle.dump(data, file)
         file.close()
         print("Saved File")
 
     async def load_languages(self):
+        """
+        Load all the languages into memory from a file.
+        :return: nothing.
+        """
+
         file = open("languages.cam", 'rb')
-        self.languages = pickle.load(file)
+        data = pickle.load(file)
+        for language_data in data:
+            new_language = Language()
+            await new_language.build_from_pickle_data(language_data)
+            self.languages.append(new_language)
         file.close()
         print("Loaded File")
 
-    async def make_change(self, change, language):
-        change_type = change.change_type
-
-        if change_type == ChangeType.ADDWORD:
-            print(change.text)
-            print(change.pronunciation)
-            print(change.definition)
-            print(change.related_words)
-            new_word = Word(change.text, change.pronunciation, change.definition, related_words=change.related_words)
-            language.words.append(new_word)
-            print("Added Word")
-
-        elif change_type == ChangeType.EDITWORD:
-            word = await language.get_word(change.text)
-            if word is not None:
-                if change.parameter == "text":
-                    word.text = change.modification
-                elif change.parameter == "pronunciation":
-                    word.pronunciation = change.modification
-                elif change.parameter == "definition":
-                    word.definition = change.modification
-
-                print("Modified Word")
-
-        elif change_type == ChangeType.REMOVEWORD:
-            word = await language.get_word(change.text)
-            if word is not None:
-                language.words.remove(word)
-                print("Removed Word")
-
-        elif change_type == ChangeType.ADDRULE:
-            language.rules.append(change.rule_desc)
-            language.should_update_rules = True
-            print("Added Rule")
-
-        elif change_type == ChangeType.EDITRULE:
-            if 1 <= change.rule_number <= len(language.rules):
-                language.rules[change.rule_number - 1] = change.rule_desc
-                language.should_update_rules = True
-                print("Updated Rule")
-
-        elif change_type == ChangeType.REMOVERULE:
-            if 1 <= change.rule_number <= len(language.rules):
-                del language.rules[change.rule_number - 1]
-                language.should_update_rules = True
-                print("Deleted Rule")
-
-        elif change_type == ChangeType.CHANGENAME:
-            language.name = change.new_name
-            language.should_update_rules = True
-            print("Changed Language Name")
-
-        elif change_type == ChangeType.ADDRELATEDWORD:
-            word = await language.get_word(change.text)
-            related_word = await language.get_word(change.related_word_text)
-            if (word is not None) and (related_word is not None):
-                word.related_words.append(related_word)
-                print("Added related word")
-
-        elif change_type == ChangeType.REMOVERELATEDWORD:
-            word = await language.get_word(change.text)
-            related_word = await language.get_word(change.related_word_text)
-            if (word is not None) and (related_word is not None):
-                word.related_words.remove(related_word)
-                print("Removed related word")
-
     async def background_tasks(self):
-        print("Started Task")
+        """
+        This method is initiated from the bot's constructor, and waits until
+        the bot is logged in and ready. This is essentially all the stuff that
+        needs to be done over and over constantly. (Voting, updating messages, etc.)
+        :return: nothing.
+        """
+
         await self.wait_until_ready()
         print("ready")
 
@@ -207,19 +256,14 @@ class LanguageBot(discord.Client):
             previous_time = time.time()
 
             for language in self.languages:
-                print("Language Loop")
                 for amendment in language.amendments:
                     amendment.time_remaining -= time_difference
                     message = await self.get_channel(language.channel_id).fetch_message(amendment.voting_message_id)
 
-                    print(amendment.time_remaining)
-
                     current_message_content = message.content
                     current_message_content = current_message_content.replace(current_message_content[:current_message_content.find("\n")], "Time Remaining: " + str(round(amendment.time_remaining)))
-                    print(current_message_content)
-                    await message.edit(content=current_message_content)
 
-                    print("In Loop")
+                    await message.edit(content=current_message_content)
 
                     if amendment.time_remaining <= 0:
                         yes_votes = 0
@@ -229,14 +273,12 @@ class LanguageBot(discord.Client):
                         for reaction in message.reactions:
                             if reaction.emoji == "✅":
                                 yes_votes = reaction.count - 1  # -1 Due to one made by the bot.
-                                print("Yes votes: " + str(yes_votes))
 
                             if reaction.emoji == "❌":
                                 no_votes = reaction.count - 1
-                                print("No votes: " + str(no_votes))
 
                         if yes_votes > no_votes:
-                            await self.make_change(amendment, language)
+                            await make_change(amendment, language)
                             language.amendments.remove(amendment)
                             await self.save_languages()
                             print("Made Change")
@@ -248,7 +290,6 @@ class LanguageBot(discord.Client):
                         await message.delete()
 
                 if language.should_update_rules:
-                    print("FUCK UP")
                     new_message = "Language: " + language.name + "\nRules:\n"
                     for index, rule in enumerate(language.rules):
                         new_message += str(index + 1) + ": " + rule + "\n"
@@ -256,30 +297,41 @@ class LanguageBot(discord.Client):
                     await message.edit(content=new_message)
                     language.should_update_rules = False
 
-            # print("Got to end of loop")
             await asyncio.sleep(5)
 
     async def get_language_from_channel(self, channel_id):
+        """
+        Helper function that returns the language associated with a particular discord channel.
+        :param channel_id: id of the discord channel.
+        :return: The language associated.
+        """
+
         for language in self.languages:
             if language.channel_id == channel_id:
                 return language
         return None
 
     async def on_message(self, message):
-        print("Received Message")
-        if message.content[:len(self.prefix)] == self.prefix:  # If the beginning of the message has the proper prefix.
+        """
+        This is a overwritten method from the Client base class. It is called
+        each time the bot sees someone send a message, which makes it perfect
+        for looking for commands.
+        :param message: The message sent. (discord.Message)
+        :return: nothing.
+        """
 
-            # PARSE THE COMMAND
+        if (message.content[:len(self.prefix)] == self.prefix) and (message.author.id != self.user.id):  # If the beginning of the message has the proper prefix.
+
+            # PARSE THE COMMAND using functions and methods above.
             total_command = message.content[len(self.prefix):]
             command_list = get_command_list(total_command)
             if command_list is None:
                 print("Error. Bad Commands.")
                 return
-            print("Command List: " + str(command_list))
 
             # EXECUTE THE COMMAND
             main_command = command_list[0]
-            if main_command == "createlanguage" and len(command_list) == 2:
+            if main_command == "createlanguage" and len(command_list) == 2:  # Create a Language.
                 if await self.get_language_from_channel(message.channel.id) is None:
                     new_language = Language(name=command_list[1])
                     new_language.channel_id = message.channel.id
@@ -317,8 +369,7 @@ class LanguageBot(discord.Client):
                     dm = await message.author.create_dm()
                     await dm.send(file=discord_file)
 
-
-            else:
+            else:  # Everything else can be treated as submitting something as an ammendment.
                 correct_message = True
                 new_change = Change()
                 voting_message_string = None
@@ -371,7 +422,6 @@ class LanguageBot(discord.Client):
                     for word in related_words:
                         voting_message_string += word + ", "
 
-
                 elif main_command == "removeword" and len(command_list) == 2:
                     new_change.change_type = ChangeType.REMOVEWORD
                     new_change.text = command_list[1]
@@ -400,22 +450,23 @@ class LanguageBot(discord.Client):
 
                     voting_message_string = "Time Remaining: " + str(new_change.time_remaining) + "\nChange:\nRemove \"" + command_list[2] + "\" as a related word to \"" + command_list[1] + '"'
 
-                else:
+                else:  # If none of these commands were triggered, something went wrong.
                     print("Incorrect Message")
                     correct_message = False
 
                 if correct_message:
                     language = await self.get_language_from_channel(message.channel.id)
-                    if language is not None:
+                    if language is not None:  # Common logic for all of the amendments.
                         voting_message = await message.channel.send(voting_message_string)
                         new_change.voting_message_id = voting_message.id
                         await voting_message.add_reaction("✅")
                         await voting_message.add_reaction("❌")
                         language.amendments.append(new_change)
-                        await self.save_languages()
-                        # print("Amendments: " + str(language.amendments))
+                        await self.save_languages()  # Save when important stuff happens.
                     else:
-                        print("Error, no language in channel.")
+                        print("Error, no language in channel.")  # Command was invoked in a language-less channel.
+
+            await message.delete()  # Get rid of all the junk (not the bot's messages though)
 
 
 bot = LanguageBot()
