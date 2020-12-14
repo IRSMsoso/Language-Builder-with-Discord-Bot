@@ -45,15 +45,20 @@ def get_command_list(full_command):
     original_command = full_command
     first_command_index = original_command.find('\"')
     if first_command_index == -1:  # There's a problem if there is no quotes in the command.
+        print("Error, Something went wrong. Likely formatted incorrectly.")
         return None
     command_list = [original_command[:first_command_index]]  # Create a list of commands starting with the base command.
+    command_list[0] = command_list[0].replace(' ', '')  # Replace any spaces since the first command can never have them.
     original_command = original_command[first_command_index:]  # Remove that first command from the rest of the string.
+    print("Command List:")
     print(command_list)
+    print("Original Command")
     print(original_command)
     while len(original_command) > 0:  # Until everything is drained form the string of commands.
         check_same = original_command
         command_list.append(original_command[1:original_command.find('\"', 1)])
         original_command = original_command[original_command.find('\"', 1) + 1:]
+        original_command = original_command[original_command.find('\"'):]  # Get rid of spaces left over between parameters.
         if check_same == original_command:  # Check if we are stuck in a loop due to formatting errors.
             print("Error, Something went wrong. Likely formatted incorrectly.")
             return None
