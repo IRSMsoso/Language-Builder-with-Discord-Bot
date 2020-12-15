@@ -129,7 +129,8 @@ def get_command_list(full_command):
                            original_command.find('\"'):]  # Get rid of spaces left over between parameters.
         if check_same == original_command:  # Check if we are stuck in a loop due to formatting errors.
             return None
-        # sleep(1)
+
+    print(command_list)
     return command_list
 
 
